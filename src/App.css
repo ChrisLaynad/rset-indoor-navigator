@@ -1,0 +1,111 @@
+* { box-sizing: border-box; }
+
+body { margin: 0; background: #e5e7eb; }
+
+.app { min-height: 100vh; }
+
+.app-empty-state {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  padding: 40px;
+  font-family: system-ui, sans-serif;
+  text-align: center;
+  color: #0f172a;
+}
+
+.app-empty-state h2 { margin: 0; }
+.app-empty-state p { margin: 0; color: #64748b; }
+
+.floor-selector {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border-bottom: 1px solid rgba(15,23,42,.09);
+  box-shadow: 0 6px 18px rgba(15,23,42,.06);
+}
+
+.floor-selector-inner {
+  width: min(1400px, calc(100% - 24px));
+  margin: 0 auto;
+  padding: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.floor-selector-title {
+  flex: 0 0 auto;
+  font-weight: 850;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.floor-buttons {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding: 2px;
+}
+
+.floor-button {
+  flex: 0 0 auto;
+  border: 1px solid #dbe3ef;
+  background: #fff;
+  color: #334155;
+  border-radius: 11px;
+  min-height: 38px;
+  padding: 7px 13px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: .14s ease;
+}
+
+.floor-button:hover { background: #eff6ff; border-color: #bfdbfe; }
+.floor-button:active { transform: scale(.97); }
+.floor-button.active { background: #2563eb; color: #fff; border-color: #2563eb; box-shadow: 0 6px 15px rgba(37,99,235,.18); }
+
+@media (max-width: 650px) {
+  .floor-selector-inner { align-items: stretch; flex-direction: column; gap: 7px; }
+  .floor-buttons { width: 100%; }
+}
+
+/* Refined floor selector */
+.floor-selector {
+  background: rgba(255,255,255,.88);
+  border-bottom-color: rgba(148,163,184,.20);
+  box-shadow: 0 8px 24px rgba(15,23,42,.07);
+}
+
+.floor-selector-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.floor-selector-title::before {
+  content: "⌖";
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 16px;
+}
+
+.floor-button {
+  min-height: 40px;
+  border-radius: 12px;
+  transition: transform .14s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.floor-button.active {
+  box-shadow: 0 7px 18px rgba(37,99,235,.22), inset 0 1px 0 rgba(255,255,255,.22);
+}
