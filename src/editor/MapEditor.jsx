@@ -4741,11 +4741,13 @@ function MapEditor({ floor }) {
                       }
 
                       onPointerDown={
-                        (event) =>
-                          startRoomEdit(
-                            event,
-                            room
-                          )
+                        isAdminMode
+                          ? (event) =>
+                              startRoomEdit(
+                                event,
+                                room
+                              )
+                          : undefined
                       }
 
                       onDoubleClick={
