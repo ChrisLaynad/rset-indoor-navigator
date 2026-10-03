@@ -2944,6 +2944,13 @@ function MapEditor({ floor }) {
     room
   ) => {
 
+    // Room editing is strictly an admin operation. The room SVG element
+    // receives pointer events directly, so the canvas-level admin guard
+    // does not protect this handler by itself.
+    if (!isAdminMode) {
+      return;
+    }
+
     if (
       activeTool !==
       "select"
