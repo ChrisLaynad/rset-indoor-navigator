@@ -41,7 +41,7 @@ const CONNECTION_STROKE_WIDTH = 4;
 // Front-end demo/admin gate. For production, move authentication to a backend.
 const ADMIN_PASSWORD = "adminrset123";
 
-function MapEditor({ floor }) {
+function MapEditor({ floor, floors, activeFloorId, onFloorChange }) {
 
   /* ==================================================
      MAP DATA
@@ -290,6 +290,11 @@ function MapEditor({ floor }) {
   const [floorImageSizes, setFloorImageSizes] =
     useState({});
 
+  const [mapZoom, setMapZoom] = useState(1);
+  const [mapOffset, setMapOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const mapPanStart = useRef(null);
+
   const imageRef = useRef(null);
   const svgRef = useRef(null);
 
@@ -331,6 +336,10 @@ function MapEditor({ floor }) {
   useEffect(() => {
 
     clearSelection();
+    setMapZoom(1);
+    setMapOffset({ x: 0, y: 0 });
+    setIsPanning(false);
+    mapPanStart.current = null;
 
     setIsDrawing(false);
     setStartPoint(null);
@@ -352,11 +361,6 @@ function MapEditor({ floor }) {
     setRoutePath([]);
     setRouteDistance(null);
 
-    setRoomRouteStartId("");
-    setRoomRouteEndId("");
-    setRoomRoutePath([]);
-    setRoomRouteDistance(null);
-    setRoomRouteAccess(null);
 
   }, [floor.id]);
 
@@ -522,6 +526,51 @@ function MapEditor({ floor }) {
       x: mapPoint.x,
       y: mapPoint.y
     };
+  };
+
+  const zoomMap = (amount) => {
+    const nextZoom = Math.min(3, Math.max(1, Number((mapZoom + amount).toFixed(2))));
+    setMapZoom(nextZoom);
+    if (nextZoom === 1) setMapOffset({ x: 0, y: 0 });
+  };
+
+  const resetMapView = () => {
+    setMapZoom(1);
+    setMapOffset({ x: 0, y: 0 });
+  };
+
+  const handleMapPointerDown = (event) => {
+    if (isAdminMode || mapZoom <= 1 || event.button !== 0) return;
+    if (event.target.closest?.(".map-controls")) return;
+
+    mapPanStart.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      offset: mapOffset,
+    };
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture is unavailable in a few embedded browser contexts.
+    }
+    setIsPanning(true);
+  };
+
+  const handleMapPointerMove = (event) => {
+    const start = mapPanStart.current;
+    if (!start || start.pointerId !== event.pointerId) return;
+
+    setMapOffset({
+      x: start.offset.x + event.clientX - start.x,
+      y: start.offset.y + event.clientY - start.y,
+    });
+  };
+
+  const handleMapPointerUp = (event) => {
+    if (mapPanStart.current?.pointerId !== event.pointerId) return;
+    mapPanStart.current = null;
+    setIsPanning(false);
   };
 
   /* ==================================================
@@ -2944,6 +2993,13 @@ function MapEditor({ floor }) {
     room
   ) => {
 
+    // Room editing is strictly an admin operation. The room SVG element
+    // receives pointer events directly, so the canvas-level admin guard
+    // does not protect this handler by itself.
+    if (!isAdminMode) {
+      return;
+    }
+
     if (
       activeTool !==
       "select"
@@ -4422,6 +4478,14 @@ function MapEditor({ floor }) {
       }))
   );
 
+  const selectedStartRoom = allRooms.find((room) => room.id === roomRouteStartId);
+  const selectedEndRoom = allRooms.find((room) => room.id === roomRouteEndId);
+  const routeFloorIds = multiFloorRoute
+    ? Object.keys(multiFloorRoute.segments || {})
+    : roomRouteAccess?.start?.floorId
+      ? [roomRouteAccess.start.floorId]
+      : [];
+
   /* ==================================================
      RENDER
   ================================================== */
@@ -4429,31 +4493,52 @@ function MapEditor({ floor }) {
   return (
     <div className="editor">
 
-      <div className="navigation-header">
+      <header className="navigation-header">
         <div className="navigation-brand">
-          <div className="navigation-brand-mark">R</div>
-          <div>
+          <div className="navigation-brand-mark" aria-hidden="true">R</div>
+          <div className="navigation-brand-copy">
             <div className="navigation-brand-title">RSET Indoor Navigator</div>
-            <div className="navigation-brand-subtitle">{floor.name}</div>
+            <div className="navigation-brand-subtitle">MAIN BUILDING · ROOM FINDER</div>
           </div>
         </div>
 
+        <nav className="floor-nav" aria-label="Choose a floor">
+          {floors.map((item, index) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-label={item.name}
+              aria-pressed={item.id === activeFloorId}
+              className={item.id === activeFloorId ? "floor-tab active" : "floor-tab"}
+              onClick={() => onFloorChange(item.id)}
+            >
+              <span className="floor-tab-index">0{index + 1}</span>
+              <span className="floor-tab-label">{item.name.replace(/\s+floor$/i, "")}</span>
+            </button>
+          ))}
+        </nav>
+
         <div className="navigation-header-actions">
           <div className={isAdminMode ? "mode-badge admin" : "mode-badge user"}>
-            <span className="mode-dot" />
-            {isAdminMode ? "Admin Mode" : "Navigation Mode"}
+            <span className="mode-dot" aria-hidden="true" />
+            {isAdminMode ? "Admin mode" : "Visitor map"}
           </div>
           {isAdminMode ? (
-            <button className="ios-button admin-exit-button" onClick={logoutAdmin}>
-              Exit Admin
+            <button type="button" className="ios-button admin-exit-button" onClick={logoutAdmin}>
+              Exit admin
             </button>
           ) : (
-            <button className="ios-button admin-login-button" onClick={openAdminLogin}>
-              🔐 Admin
+            <button type="button" className="ios-button admin-login-button" onClick={openAdminLogin}>
+              <svg className="admin-login-icon" viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M6.2 8V5.8a3.8 3.8 0 0 1 7.6 0V8" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                <rect x="3.5" y="8" width="13" height="9" rx="2.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
+                <circle cx="10" cy="12.4" r="1" fill="currentColor" />
+              </svg>
+              <span>Admin access</span>
             </button>
           )}
         </div>
-      </div>
+      </header>
 
       {isAdminMode && (
         <>
@@ -4522,104 +4607,170 @@ function MapEditor({ floor }) {
         </>
       )}
 
-      <div className={isAdminMode ? "room-route-panel admin-route-panel" : "room-route-panel navigation-panel"}>
+      <section className={isAdminMode ? "room-route-panel admin-route-panel" : "room-route-panel navigation-panel"} aria-labelledby="route-planner-title">
         <div className="room-route-heading">
-          <div>
-            <div className="room-route-title">Find a destination</div>
-            <div className="room-route-subtitle">Choose a starting room and destination. Your route is shown in blue. Map editing is available only to Admin.</div>
+          <div className="route-heading-copy">
+            <span className="route-eyebrow">RSET · INDOOR ROUTING</span>
+            <h1 className="room-route-title" id="route-planner-title">Find your way around RSET</h1>
+            <p className="room-route-subtitle">Choose where you are and where you want to go. Your path will appear on the floor plan.</p>
           </div>
-          <div className="navigation-live-pill">LIVE MAP</div>
+          <div className="navigation-live-pill">MAP READY</div>
         </div>
 
-        <label>
-          From
+        <label className="route-field" htmlFor="route-start-room">
+          <span className="route-field-label"><span className="route-field-marker start" aria-hidden="true" />Starting room</span>
           <select
+            id="route-start-room"
+            aria-label="Starting room"
             value={roomRouteStartId}
             onChange={(event) => {
               setRoomRouteStartId(event.target.value);
               clearRoomRoute();
             }}
           >
-            <option value="">Select starting room</option>
-            {Object.entries(mapData).flatMap(([floorId, data]) =>
-              (data.rooms || []).map((room) => (
-                <option key={`${floorId}:${room.id}`} value={room.id}>
-                  {room.name} ({FLOOR_ORDER.find((id) => id === floorId) || floorId})
-                </option>
-              ))
-            )}
+            <option value="">Choose your starting room</option>
+            {floors.map((floorOption) => {
+              const floorRooms = mapData[floorOption.id]?.rooms || [];
+              return floorRooms.length > 0 ? (
+                <optgroup key={floorOption.id} label={floorOption.name}>
+                  {floorRooms.map((room) => (
+                    <option key={room.id} value={room.id}>{room.name}</option>
+                  ))}
+                </optgroup>
+              ) : null;
+            })}
           </select>
         </label>
 
-        <label>
-          To
+        <label className="route-field" htmlFor="route-end-room">
+          <span className="route-field-label"><span className="route-field-marker destination" aria-hidden="true" />Destination</span>
           <select
+            id="route-end-room"
+            aria-label="Destination room"
             value={roomRouteEndId}
             onChange={(event) => {
               setRoomRouteEndId(event.target.value);
               clearRoomRoute();
             }}
           >
-            <option value="">Select destination room</option>
-            {Object.entries(mapData).flatMap(([floorId, data]) =>
-              (data.rooms || []).map((room) => (
-                <option key={`${floorId}:${room.id}`} value={room.id}>
-                  {room.name} ({FLOOR_ORDER.find((id) => id === floorId) || floorId})
-                </option>
-              ))
-            )}
+            <option value="">Choose your destination</option>
+            {floors.map((floorOption) => {
+              const floorRooms = mapData[floorOption.id]?.rooms || [];
+              return floorRooms.length > 0 ? (
+                <optgroup key={floorOption.id} label={floorOption.name}>
+                  {floorRooms.map((room) => (
+                    <option key={room.id} value={room.id}>{room.name}</option>
+                  ))}
+                </optgroup>
+              ) : null;
+            })}
           </select>
         </label>
 
         <button
+          type="button"
           className="room-route-button"
           onClick={() => {
             triggerHaptic(12);
             findRoomRoute();
           }}
-          disabled={
-            !roomRouteStartId ||
-            !roomRouteEndId ||
-            Object.values(mapData).reduce(
-              (total, data) => total + (data.rooms || []).length,
-              0
-            ) < 2
-          }
+          disabled={!roomRouteStartId || !roomRouteEndId || roomRouteStartId === roomRouteEndId || allRooms.length < 2}
         >
-          Find Room Route
+          Show my route
         </button>
 
-        {roomRoutePath.length >= 1 && roomRouteDistance !== null && (
-          <div className="room-route-result">
-            <strong>Route found</strong>
-            <span>
-              {roomRouteDistance.toFixed(1)} map units
-            </span>
-            <span>
-              {roomRoutePath.length} navigation nodes
-            </span>
+        <p className="route-form-hint" id="route-form-hint" aria-live="polite">
+          {roomRouteStartId && roomRouteEndId && roomRouteStartId === roomRouteEndId
+            ? "Choose two different rooms to create a route."
+            : "Routes between floors are split into floor-by-floor steps."}
+        </p>
+
+        {roomRoutePath.length > 0 && roomRouteDistance !== null && (
+          <div className="room-route-result" aria-live="polite">
+            <div className="route-result-copy">
+              <span className="route-result-kicker">ROUTE READY</span>
+              <strong>
+                {selectedStartRoom?.name || "Starting room"}
+                <span className="route-result-arrow" aria-hidden="true">→</span>
+                {selectedEndRoom?.name || "Destination"}
+              </strong>
+              <span className="route-result-caption">Select a floor step to view that part of your path.</span>
+            </div>
+            {routeFloorIds.length > 0 && (
+              <div className="route-floor-steps" aria-label="Floors on this route">
+                {routeFloorIds.map((routeFloorId, index) => {
+                  const routeFloor = floors.find((item) => item.id === routeFloorId);
+                  if (!routeFloor) return null;
+                  const isActive = routeFloor.id === floor.id;
+                  const routeStepLabel = multiFloorRoute
+                    ? "Show step " + (index + 1) + " on " + routeFloor.name
+                    : "Show route on " + routeFloor.name;
+                  return (
+                    <button
+                      key={routeFloor.id}
+                      type="button"
+                      className={isActive ? "route-floor-step active" : "route-floor-step"}
+                      aria-label={routeStepLabel}
+                      aria-current={isActive ? "step" : undefined}
+                      onClick={() => onFloorChange(routeFloor.id)}
+                    >
+                      <span className="route-step-index">0{index + 1}</span>
+                      <span className="route-step-name">{routeFloor.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <button
+              type="button"
+              className="room-route-clear"
+              aria-label="Clear route"
+              onClick={() => { triggerHaptic(8); clearRoomRoute(); }}
+            >
+              Clear route
+            </button>
           </div>
         )}
+      </section>
 
-        {roomRouteAccess && (
-          <div className="room-route-access">
-            <span>
-              {roomRouteAccess.start.roomName} → {roomRouteAccess.start.nodeId === roomRouteAccess.end.nodeId ? "same node" : roomRouteAccess.end.roomName}
-            </span>
+      <section className="map-editor-container" aria-labelledby="floor-map-title">
+        <div className="map-section-heading">
+          <div>
+            <span className="section-kicker">FLOOR PLAN</span>
+            <h2 id="floor-map-title">{floor.name}</h2>
+            <p>Zoom in, then drag the plan to inspect room labels and corridors.</p>
           </div>
-        )}
-
-        {roomRoutePath.length > 0 && (
-          <button
-            className="room-route-clear"
-            onClick={() => { triggerHaptic(8); clearRoomRoute(); }}
-          >
-            Clear Route
-          </button>
-        )}
-      </div>
-
-      <div className="map-editor-container">
+          <div className="map-section-actions">
+            {roomRoutePath.length > 0 && (
+              <div className="map-route-legend"><span aria-hidden="true" />Route on this floor</div>
+            )}
+          <div className="map-controls" role="group" aria-label={"Map controls for " + floor.name}>
+            <button
+              type="button"
+              className="map-control-button"
+              aria-label="Zoom out"
+              title="Zoom out"
+              disabled={mapZoom <= 1}
+              onClick={() => zoomMap(-0.25)}
+            >−</button>
+            <span className="map-zoom-value" aria-live="polite">{Math.round(mapZoom * 100)}%</span>
+            <button
+              type="button"
+              className="map-control-button"
+              aria-label="Zoom in"
+              title="Zoom in"
+              disabled={mapZoom >= 3}
+              onClick={() => zoomMap(0.25)}
+            >+</button>
+            <button
+              type="button"
+              className="map-reset-button"
+              onClick={resetMapView}
+              disabled={mapZoom === 1 && mapOffset.x === 0 && mapOffset.y === 0}
+            >Reset</button>
+          </div>
+          </div>
+        </div>
 
         {!floor?.image && (
           <div className="loading-map">
@@ -4630,7 +4781,16 @@ function MapEditor({ floor }) {
         {floor?.image && (
 
           <div
-            className="map-stage"
+            className={
+              "map-stage" +
+              (mapZoom > 1 ? " is-zoomed" : "") +
+              (!isAdminMode && mapZoom > 1 ? " is-pannable" : "") +
+              (isPanning ? " is-panning" : "")
+            }
+            onPointerDown={handleMapPointerDown}
+            onPointerMove={handleMapPointerMove}
+            onPointerUp={handleMapPointerUp}
+            onPointerCancel={handleMapPointerUp}
             style={{
               aspectRatio:
                 imageSize.width &&
@@ -4639,6 +4799,10 @@ function MapEditor({ floor }) {
                   : "1 / 1"
             }}
           >
+            <div
+              className="map-canvas"
+              style={{ transform: "translate3d(" + mapOffset.x + "px, " + mapOffset.y + "px, 0) scale(" + mapZoom + ")" }}
+            >
 
             {/* FLOOR PLAN */}
 
@@ -4734,11 +4898,13 @@ function MapEditor({ floor }) {
                       }
 
                       onPointerDown={
-                        (event) =>
-                          startRoomEdit(
-                            event,
-                            room
-                          )
+                        isAdminMode
+                          ? (event) =>
+                              startRoomEdit(
+                                event,
+                                room
+                              )
+                          : undefined
                       }
 
                       onDoubleClick={
@@ -5991,128 +6157,53 @@ function MapEditor({ floor }) {
               )}
 
             </svg>
+            </div>
+
 
           </div>
         )}
-      </div>
+      </section>
 
       {/* ==================================================
           INFO BAR
       ================================================== */}
 
-      <div className={isAdminMode ? "editor-info" : "editor-info user-info-bar"}>
-
-        <strong>
-          {floor.name}
-        </strong>
-
-        <span className="wall-count">
-          Walls: {walls.length}
-        </span>
-
-        <span className="wall-count">
-          Doors: {doors.length}
-        </span>
-
-        <span className="wall-count">
-          Windows: {windows.length}
-        </span>
-
-        <span className="wall-count">
-          Stairs: {stairs.length}
-        </span>
-
-        <span className="wall-count">
-          Lifts: {lifts.length}
-        </span>
-
-        <span className="wall-count">
-          Rooms: {rooms.length}
-        </span>
-
-        <span className="wall-count">
-          Nodes: {nodes.length}
-        </span>
-
-        <span className="wall-count">
-          Connections: {connections.length}
-        </span>
-
-        {selectedRoomId && (
-          <span className="selected-info">
-            Selected room
-          </span>
+      <div className={isAdminMode ? "editor-info admin-info-bar" : "editor-info user-info-bar"} aria-live="polite">
+        {isAdminMode && (
+          <>
+            <strong>{floor.name}</strong>
+            <span className="wall-count">Walls: {walls.length}</span>
+            <span className="wall-count">Doors: {doors.length}</span>
+            <span className="wall-count">Windows: {windows.length}</span>
+            <span className="wall-count">Stairs: {stairs.length}</span>
+            <span className="wall-count">Lifts: {lifts.length}</span>
+            <span className="wall-count">Rooms: {rooms.length}</span>
+            <span className="wall-count">Nodes: {nodes.length}</span>
+            <span className="wall-count">Connections: {connections.length}</span>
+            {selectedRoomId && <span className="selected-info">Selected room</span>}
+            {roomEditMode === "move" && <span>Dragging room</span>}
+            {roomEditMode?.startsWith("resize") && <span>Resizing room</span>}
+          </>
         )}
 
-        {roomEditMode ===
-          "move" && (
-          <span>
-            Dragging room
-          </span>
+        {!isAdminMode && roomRoutePath.length === 0 && (
+          <span className="map-note">Choose a route above to highlight your way across this floor plan.</span>
         )}
 
-        {roomEditMode?.startsWith(
-          "resize"
-        ) && (
-          <span>
-            Resizing room
-          </span>
-        )}
-
-        {activeTool ===
-          "room" && (
-          <span>
-            Drag to create a room
-          </span>
-        )}
-
-        {activeTool ===
-          "node" && (
-          <span>
-            Click to place a navigation node at the exact clicked position
-          </span>
-        )}
-
-        {activeTool ===
-          "connect" && (
-          <span>
-            Click two nodes to create a navigation connection
-          </span>
-        )}
-
-        {activeTool ===
-          "select" && (
-          <span>
-            Double-click a room to rename
-          </span>
-        )}
+        {isAdminMode && activeTool === "room" && <span>Drag to create a room</span>}
+        {isAdminMode && activeTool === "node" && <span>Click to place a navigation node</span>}
+        {isAdminMode && activeTool === "connect" && <span>Click two nodes to create a navigation connection</span>}
+        {isAdminMode && activeTool === "select" && <span>Double-click a room to rename</span>}
+        {isAdminMode && activeTool === "route" && !routeStartNodeId && <span>Click a node to choose the start point</span>}
+        {isAdminMode && activeTool === "route" && routeStartNodeId && !routeEndNodeId && <span>Start selected — click another node for the destination</span>}
 
         {roomRoutePath.length > 0 && roomRouteDistance !== null && (
-          <span className="selected-info">
-            Room route: {roomRouteDistance.toFixed(1)} map units
-          </span>
+          <span className="selected-info">{multiFloorRoute ? "Route segment" : "Route ready"} · {floor.name}</span>
         )}
-
-        {activeTool === "route" && !routeStartNodeId && (
-          <span>
-            Click a node to choose the start point
-          </span>
+        {isAdminMode && routePath.length >= 2 && routeDistance !== null && (
+          <span className="selected-info">Route: {routePath.length} nodes · Distance: {routeDistance.toFixed(1)} map units</span>
         )}
-
-        {activeTool === "route" && routeStartNodeId && !routeEndNodeId && (
-          <span>
-            Start selected — click another node for the destination
-          </span>
-        )}
-
-        {routePath.length >= 2 && routeDistance !== null && (
-          <span className="selected-info">
-            Route: {routePath.length} nodes · Distance: {routeDistance.toFixed(1)} map units
-          </span>
-        )}
-
       </div>
-
 
       {showAdminLogin && (
         <div className="admin-modal-backdrop" onPointerDown={() => setShowAdminLogin(false)}>
