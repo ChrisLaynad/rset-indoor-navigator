@@ -1,3 +1,19 @@
-*{box-sizing:border-box}html,body,#root{margin:0;min-width:320px;min-height:100%}body{background:#f6f8fb}.app{min-height:100vh}.app-empty-state{min-height:100vh;display:grid;place-items:center;align-content:center;gap:6px;padding:40px;color:#0f172a;background:radial-gradient(circle at 20% 10%,#dbeafe,transparent 35%),#f8fafc;font-family:system-ui,sans-serif;text-align:center}.app-empty-state h2,.app-empty-state p{margin:0}.app-empty-state p{color:#64748b}
-.floor-selector{position:sticky;top:0;z-index:95;border-bottom:1px solid #0f172a14;background:#ffffffd6;backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%)}.floor-selector-inner{width:min(1480px,calc(100% - 32px));min-height:58px;margin:0 auto;padding:8px 0;display:flex;align-items:center;justify-content:space-between;gap:16px}.floor-selector-title{display:flex;align-items:center;gap:9px;flex:0 0 auto;color:#0f172a;font-size:12px;font-weight:850}.floor-selector-title:before{content:"R";width:28px;height:28px;display:grid;place-items:center;border-radius:9px;color:#fff;background:linear-gradient(145deg,#0f172a,#2563eb);box-shadow:0 6px 15px #2563eb2e;font-size:11px;font-weight:900}.floor-buttons{display:flex;align-items:center;gap:4px;padding:3px;overflow-x:auto;border:1px solid #94a3b83b;border-radius:12px;background:#f8fafad6;scrollbar-width:none}.floor-buttons::-webkit-scrollbar{display:none}.floor-button{flex:0 0 auto;min-height:34px;padding:6px 12px;border:1px solid transparent;border-radius:9px;color:#64748b;background:transparent;font:inherit;font-size:10px;font-weight:800;cursor:pointer;transition:color .16s,background .18s,box-shadow .18s,transform .16s}.floor-button:hover{color:#1e3a8a;background:#eff6ff}.floor-button:active{transform:scale(.97)}.floor-button.active{color:#fff;background:#2563eb;box-shadow:0 6px 14px #2563eb38}.floor-button:focus-visible{outline:3px solid #2563eb33;outline-offset:2px}
-@media(max-width:650px){.floor-selector-inner{width:calc(100% - 20px);min-height:54px;gap:9px}.floor-selector-title{font-size:10px}.floor-selector-title:before{width:25px;height:25px}.floor-buttons{max-width:64vw}.floor-button{min-height:32px;padding-inline:10px;font-size:9px}}
+.app { min-height: 100vh; min-height: 100dvh; }
+
+.app-empty-state {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 32px;
+  color: #152238;
+  background: #f5f7fa;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  text-align: center;
+}
+
+.app-empty-state h2,
+.app-empty-state p { margin: 0; }
+.app-empty-state p { color: #69788a; }
